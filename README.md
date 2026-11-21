@@ -5,7 +5,7 @@ A complete, dependency-free Luau UI library rebuilt 1:1 from the Figma project
 component gallery, config persistence for executors, and a small, explicit API
 for the pieces most UI libraries hide.
 
-![Aurora window](assets/live-full.png)
+<img width="677" height="433" alt="image" src="https://github.com/user-attachments/assets/7e499f89-08f7-4742-a9cf-c256b7f0e4ae" />
 
 - **Literal frosted glass.** A neutral frost texture is clipped inside the
   window. There is no scenic backdrop, no screenshot of the game behind it, and
