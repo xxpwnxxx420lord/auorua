@@ -1776,7 +1776,11 @@ end
 
 function Window:GetToggle(name: string): boolean?
 	local record = self._toggles[name]
-	return record and record.Value or nil
+	if not record then
+		return nil
+	end
+	-- Keep false distinct from "not registered" (false or nil would collapse them).
+	return record.Value == true
 end
 
 function Window:GetToggles(): { [string]: boolean }

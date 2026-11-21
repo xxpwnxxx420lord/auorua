@@ -697,7 +697,7 @@ AuroraUI/
     Banner.lua, Tooltip.lua, Progress.lua, Input.lua, Dropdown.lua
 AuroraDemo.client.lua -- Figma replica (Overview / Controls / Appearance)
 AuroraKit.client.lua  -- component gallery (Buttons / Fields / Color / Media)
-example.lua           -- executor example: every control on one window
+example.lua           -- executor example: window with the main controls
 executor.lua          -- one-line GitHub loader for executors
 assets/               -- Figma reference + generated frost source
 public/               -- images that back the uploaded asset IDs

@@ -1,7 +1,7 @@
 --!nocheck
 -- Aurora UI · example script
--- Paste this into any executor. It downloads the library, builds a window and
--- wires up one of every control. Nothing here touches UDim2 or the internals.
+-- Paste this into any executor. It downloads the library and builds a window
+-- with the main controls. Nothing here touches UDim2 or the internals.
 
 local Aurora = loadstring(game:HttpGet(
 	"https://raw.githubusercontent.com/xxpwnxxx420lord/auorua/main/executor.lua"
@@ -9,7 +9,6 @@ local Aurora = loadstring(game:HttpGet(
 
 local Window = Aurora:CreateWindow({
 	Title = "Aurora",
-	SubTitle = "example",
 	Theme = "Dark",
 	Accent = Color3.fromRGB(10, 132, 255),
 	Config = "aurora_example", -- optional autosave, no manager needed
@@ -22,11 +21,8 @@ local Settings = Window:AddTab("Settings")
 -- Main
 --------------------------------------------------------------------------------
 
-Main:AddParagraph("Welcome", "One of every control, placed automatically.")
-
 local auto = Main:AddToggle({
 	Title = "Auto apply",
-	Description = "Registers with the window so configs can restore it.",
 	Default = true,
 	Id = "AutoApply",
 })
@@ -62,7 +58,6 @@ end)
 
 Main:AddButton({
 	Title = "Notification",
-	Description = "Shows the glass banner.",
 	Callback = function()
 		Window:Notify({
 			Title = "Hello",
@@ -90,4 +85,3 @@ Settings:AddToggle({
 end)
 
 Window:SelectTab(1)
-Window:Notify({ Title = "Aurora", Content = "The script has been loaded." })
