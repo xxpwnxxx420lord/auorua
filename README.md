@@ -157,7 +157,7 @@ local Window = Aurora:CreateWindow({
 local Main = Window:AddTab("Main")
 local Settings = Window:AddTab("Settings")
 
-Main:AddParagraph("Welcome", "Everything below is built from the glass kit.")
+Main:AddParagraph("Profile", "Signed in as Player.")
 
 Main:AddButton("Click me", function()
     Window:Notify({ Title = "Clicked", Content = "The button works." })
