@@ -294,7 +294,7 @@ function Theme.newContext(mode: string?, accent: Color3?, overrides: { [string]:
 	local self = setmetatable({}, Context)
 	self.Mode = mode == "Light" and "Light" or "Dark"
 	self.CanonicalAccent = Theme.canonicalAccent(accent or Theme.Accents[1].Color)
-	self.Overrides = overrides and table.clone(overrides) or {}
+	self.Overrides = typeof(overrides) == "table" and table.clone(overrides) or {}
 	self.Theme = Theme.resolve(self.Mode, self.CanonicalAccent, self.Overrides)
 	self.Changed = Util.Signal.new()
 	self._binds = {}
@@ -367,14 +367,14 @@ end
 --   window:SetTheme({ ... }, true)             -- crossfade the change
 --   window:SetTheme({ ... }, true, true)       -- replace instead of merge
 function Context:SetTheme(overrides: { [string]: any }?, animate: boolean?, replace: boolean?)
+	if overrides ~= nil and typeof(overrides) ~= "table" then
+		return
+	end
 	if overrides == nil then
 		table.clear(self.Overrides)
 	elseif replace then
 		self.Overrides = table.clone(overrides)
 	else
-		if typeof(overrides) ~= "table" then
-			return
-		end
 		for key, value in pairs(overrides) do
 			self.Overrides[key] = value
 		end

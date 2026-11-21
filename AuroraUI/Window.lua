@@ -48,6 +48,10 @@ function Window.new(props: { [string]: any }?)
 
 	self.Parent = assert(options.Parent, "Aurora.Window requires a Parent")
 	self.Context = assert(options.Context, "Aurora.Window requires a Context")
+	-- Custom option: theme = { ...token overrides... }
+	if typeof(options.Theme) == "table" then
+		self.Context:SetTheme(options.Theme, false)
+	end
 	self.Player = options.Player or Players.LocalPlayer
 	self.Tabs = options.Tabs or {}
 	self.Title = options.Title or "Aurora"
