@@ -22,6 +22,9 @@ for the pieces most UI libraries hide.
   `gethui()` when the executor provides it, then `CoreGui`, then `PlayerGui`.
   Optional configs use `writefile` / `readfile` / `makefolder` / `listfiles` /
   `delfile`, and fall back to an in-memory store in Studio.
+- **Simple to use.** `Aurora:CreateWindow` then `Window:AddTab` then
+  `Tab:AddToggle` / `AddSlider` / `AddButton` / … Every control places itself in
+  a scrolling glass card, so you never write `UDim2`.
 - **Custom options:** `StartingTab`, `Close()` / `Open()`, `ChangeToggle`,
   a `Theme` override table, and `BackgroundImage`.
 
@@ -45,7 +48,7 @@ to `StarterPlayerScripts`.
 1. Create a **ModuleScript** named `AuroraUI` in `ReplicatedStorage`.
 2. Copy `AuroraUI/init.lua` into it.
 3. Add the other modules as children of `AuroraUI`:
-   - `Util`, `Theme`, `Config`, `Window` as ModuleScripts
+   - `Util`, `Theme`, `Config`, `Tab`, `Window` as ModuleScripts
    - `Components` as a ModuleScript (`Components/init.lua`) with every
      `Components/*.lua` file as a ModuleScript child
 4. Require it:
@@ -70,17 +73,18 @@ local Aurora = loadstring(game:HttpGet(
 ))()
 ```
 
-That is the entire installation. Use it exactly like the Studio examples:
+That is the entire installation. Use it exactly like any other UI library:
 
 ```lua
-local gui = Aurora.newScreenGui({ Name = "Aurora" })
-local ctx = Aurora.newContext("Dark")
-local window = Aurora.createWindow({
-    Parent = gui,
-    Context = ctx,
-    Tabs = tabs,
-})
+local Window = Aurora:CreateWindow({ Title = "My script", SubTitle = "by me" })
+local Main = Window:AddTab("Main")
+
+Main:AddToggle("Auto apply", true):OnChanged(function(value)
+    print(value)
+end)
 ```
+
+The [Quick start](#quick-start) below is the full version.
 
 **Requirements**
 
@@ -141,23 +145,169 @@ way to keep tabs, toggles, accent and position between launches.
 ## Quick start
 
 ```lua
+local Aurora = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/xxpwnxxx420lord/auorua/main/executor.lua"
+))()
+
+local Window = Aurora:CreateWindow({
+    Title = "My script",
+    SubTitle = "by me",
+})
+
+local Main = Window:AddTab("Main")
+local Settings = Window:AddTab("Settings")
+
+Main:AddParagraph("Welcome", "Everything below is built from the glass kit.")
+
+Main:AddButton("Click me", function()
+    Window:Notify({ Title = "Clicked", Content = "The button works." })
+end)
+
+local auto = Main:AddToggle("Auto apply", true)
+auto:OnChanged(function(value)
+    print("Auto apply:", value)
+end)
+
+local speed = Main:AddSlider("Walk speed", 0, 100, 32)
+speed:OnChanged(function(value)
+    print("Speed:", value)
+end)
+
+local mode = Main:AddDropdown("Mode", { "Low", "Medium", "High" }, "Medium")
+mode:OnChanged(function(value)
+    print("Mode:", value)
+end)
+
+local name = Main:AddInput("Name", "Type here", "Player")
+name:OnChanged(function(value)
+    print("Name:", value)
+end)
+
+Settings:AddColorPicker("Accent", Color3.fromRGB(10, 132, 255))
+```
+
+That is the whole script. `Window`, `Main` and every control are normal Luau
+tables. There is no global `Options` table and no addon managers.
+
+`Aurora:CreateWindow` creates the ScreenGui and theme context for you, then
+`AddTab` adds the sidebar item and an empty glass page. Every `Add*` method
+places its own control in a scrolling card stack, so you never write `UDim2`.
+
+### Controls
+
+Both forms work. The positional form is shorter; the table form adds
+descriptions and ids.
+
+```lua
+Main:AddButton("Click me", function() end)
+
+Main:AddButton({
+    Title = "Click me",
+    Description = "Optional second line",
+    Callback = function() end,
+})
+
+local auto = Main:AddToggle("Auto apply", true)
+local auto = Main:AddToggle({
+    Title = "Auto apply",
+    Default = true,
+    Id = "AutoApply", -- optional: registers a window toggle for configs
+})
+
+local speed = Main:AddSlider("Walk speed", 0, 100, 32)
+local speed = Main:AddSlider({
+    Title = "Walk speed",
+    Min = 0,
+    Max = 100,
+    Default = 32,
+    Step = 1,
+    Suffix = " studs",
+})
+
+local mode = Main:AddDropdown("Mode", { "Low", "Medium", "High" }, "Medium")
+local name = Main:AddInput("Name", "Type here", "Player")
+local accent = Main:AddColorPicker("Accent", Color3.fromRGB(10, 132, 255))
+
+Main:AddParagraph("About", "A longer line of text that wraps automatically.")
+Main:AddParagraph({ Title = "About", Content = "Table form also works." })
+```
+
+Every value control returns the same tiny interface:
+
+```lua
+control.Value                    -- current value
+control:SetValue(value)          -- updates the control and fires OnChanged
+control:OnChanged(function(value)
+    print(value)
+end)
+```
+
+`AddColorPicker` uses `(color, alpha)` for both `OnChanged` and `SetValue`.
+The returned control also has the underlying component attached
+(`control.Switch`, `control.Slider`, `control.Dropdown`, `control.Input`,
+`control.Picker`) if you need low-level access.
+
+### Notifications
+
+```lua
+Window:Notify({ Title = "Saved", Content = "Your settings were applied." })
+Window:Notify("Done") -- title only
+```
+
+The banner slides in from the right and hides itself after a few seconds. Pass
+`Duration = false` to leave it on screen until the next notification.
+
+### Window options
+
+```lua
+local Window = Aurora:CreateWindow({
+    Title = "My script",
+    SubTitle = "optional titlebar suffix",
+    Theme = "Dark",                -- "Dark", "Light", or a token override table
+    Accent = Color3.fromRGB(10, 132, 255),
+    Tabs = { "Main", "Settings" }, -- optional; AddTab works too
+    StartingTab = 1,
+    BackgroundImage = "rbxassetid://YOUR_IMAGE_ID",
+    Config = "my_script",          -- optional autosave, no manager needed
+})
+```
+
+If you omit `Parent`, `CreateWindow` makes and owns the ScreenGui. Pass
+`Parent = existingScreenGui` to use your own.
+
+### Adding to an existing window
+
+`AddTab` works after the window exists, so scripts can register tabs lazily:
+
+```lua
+local Tab = Window:AddTab({ Title = "Extra", Icon = "grid" })
+Tab:AddToggle("Feature", false)
+
+print(Window:GetTab("Extra") == Tab) -- true
+Window:SelectTab(2)
+```
+
+Tabs without an icon cycle the three Figma tiles automatically. `Icon` accepts
+`"grid"`, `"sliders"` or `"paint"`; pass `Icon = ""` for a flat tile.
+
+<details>
+<summary>Advanced: build pages manually</summary>
+
+The low-level API is still there if you want exact Figma positioning or your
+own layout. `Aurora.createWindow` requires a parent and context; components and
+`Build` callbacks are unchanged.
+
+```lua
 local Aurora = require(game:GetService("ReplicatedStorage").AuroraUI)
-local Theme = Aurora.Theme
-local Util = Aurora.Util
 local C = Aurora.Components
 
--- 1. Context = mode + accent + optional token overrides
 local ctx = Aurora.newContext("Dark")
-
--- 2. ScreenGui (gethui -> CoreGui -> PlayerGui automatically)
 local gui = Aurora.newScreenGui({ Name = "Aurora" })
 
--- 3. Build your pages
 local tabs = {
     {
         Name = "Overview",
         Glyph = "grid",
-        Badge = { Color3.fromHex("5AC8FA"), Color3.fromHex("0A84FF") },
         Build = function(page, context, window)
             window:BuildHeader(page, "Overview")
 
@@ -165,7 +315,6 @@ local tabs = {
                 Context = context,
                 Parent = page,
                 Width = 428,
-                Height = 99,
             })
             local row = C.Row.new({ Context = context, Label = "Auto-apply" })
             local switch = C.Switch.new({ Context = context, Value = true })
@@ -178,17 +327,14 @@ local tabs = {
     },
 }
 
--- 4. Window
 local window = Aurora.createWindow({
     Parent = gui,
     Context = ctx,
     Tabs = tabs,
-    StartingTab = 1,
 })
 ```
 
-`Aurora.createWindow` creates a default context if you omit `Context`. Use
-`Aurora.Window.new` if you prefer to be explicit.
+</details>
 
 ---
 
@@ -199,10 +345,9 @@ local window = Aurora.createWindow({
 1-based index, clamped to the number of tabs.
 
 ```lua
-local window = Aurora.createWindow({
-    Parent = gui,
-    Context = ctx,
-    Tabs = tabs,
+local Window = Aurora:CreateWindow({
+    Title = "My script",
+    Tabs = { "Main", "Controls", "Appearance" },
     StartingTab = 3, -- Appearance
 })
 ```
@@ -214,71 +359,87 @@ hides it. `Open()` brings the same window back without rebuilding it. The yellow
 light still minimizes to the pill.
 
 ```lua
-window:Close()
-window:Open()
-window:Toggle()
+local Window = Aurora:CreateWindow({ Title = "My script" })
 
-window.ClosedChanged:Connect(function(closed)
+Window:Close()
+Window:Open()
+Window:Toggle()
+
+Window.ClosedChanged:Connect(function(closed)
     print(closed and "closed" or "opened")
 end)
 
-print(window:IsOpen()) -- true / false
+print(Window:IsOpen()) -- true / false
 ```
 
 `OnClose` / `OnOpen` callbacks are supported:
 
 ```lua
-window.OnClose = function()
+Window.OnClose = function()
     print("window closed")
 end
 ```
 
 ### `ChangeToggle` — named boolean state
 
-Register an existing switch with `BindToggle`, create one with `AddToggle`, or
-declare values up front. `ChangeToggle(name, boolean)` updates the switch, the
-stored value, fires `ToggleChanged`, and runs the callback.
+Register an existing switch with `BindToggle`, or give a control an `Id` and it
+is registered automatically. `ChangeToggle(name, boolean)` updates the switch,
+the stored value, fires `ToggleChanged`, and runs the callback.
 
 ```lua
-local switch = C.Switch.new({ Context = ctx, Value = true })
-window:BindToggle("AutoApply", switch, function(value)
-    print("AutoApply =", value)
-end)
+local Window = Aurora:CreateWindow({ Title = "My script" })
+local Main = Window:AddTab("Main")
 
-window:ChangeToggle("AutoApply", false)
-print(window:GetToggle("AutoApply")) -- false
+local auto = Main:AddToggle({
+    Title = "Auto apply",
+    Default = true,
+    Id = "AutoApply", -- registers it for ChangeToggle + configs
+})
+
+Window:ChangeToggle("AutoApply", false)
+print(auto.Value)                  -- false
+print(Window:GetToggle("AutoApply")) -- false
 
 -- All toggles at once (handy for configs)
-for name, value in pairs(window:GetToggles()) do
+for name, value in pairs(Window:GetToggles()) do
     print(name, value)
 end
 
-window.ToggleChanged:Connect(function(name, value)
+Window.ToggleChanged:Connect(function(name, value)
     print(name, value)
 end)
 ```
 
-Create + register in one call:
+If you built the switch yourself with the low-level API, hand it over:
 
 ```lua
-local slowMode = window:AddToggle("SlowMode", {
-    Parent = row.Root,
-    Value = false,
+Window:BindToggle("SlowMode", switch, function(value)
+    print("SlowMode =", value)
+end)
+```
+
+Create + register one control in a single call:
+
+```lua
+local slowMode = Main:AddToggle({
+    Title = "Slow mode",
+    Default = false,
+    Id = "SlowMode",
 })
 ```
 
 Values can be declared before the switch exists:
 
 ```lua
-local window = Aurora.createWindow({
-    -- ...
+local Window = Aurora:CreateWindow({
+    Title = "My script",
     Toggles = {
         AutoApply = true,
         ReduceMotion = false,
     },
 })
 
-window:ChangeToggle("ReduceMotion", true)
+Window:ChangeToggle("ReduceMotion", true)
 ```
 
 ### `Theme` — token overrides
@@ -288,30 +449,48 @@ Anything you pass wins, including derived accent tokens. If you only override
 `Accent`, the hover/pressed/gradient tokens are still derived from it.
 
 ```lua
-local ctx = Aurora.newContext("Dark", nil, {
-    GlassWindow = Color3.fromHex("10131C"),
-    GlassWindowTransparency = 0.25,
-    GlassDepth = Color3.fromHex("080A10"),
-    GlassDepthTransparency = 0.18,
-    Accent = Color3.fromHex("FF7AB6"),
-    StrokeGlassTransparency = 0.70,
-    LabelSecondaryTransparency = 0.28,
+local Window = Aurora:CreateWindow({
+    Title = "My script",
+    Theme = "Dark", -- or the token override table below
+    Accent = Color3.fromRGB(10, 132, 255),
+})
+
+-- Token overrides straight into the window
+local Window = Aurora:CreateWindow({
+    Title = "My script",
+    Theme = {
+        GlassWindow = Color3.fromHex("10131C"),
+        GlassWindowTransparency = 0.25,
+        Accent = Color3.fromHex("FF7AB6"),
+        StrokeGlassTransparency = 0.70,
+    },
 })
 
 -- Change later (merge by default)
-window:SetTheme({
+Window:SetTheme({
     GlassWindow = Color3.fromHex("1A1026"),
     GlassWindowTransparency = 0.30,
 }, true) -- true = animated crossfade
 
 -- Replace the whole override table
-window:SetTheme({ Accent = Color3.fromHex("30D158") }, true, true)
+Window:SetTheme({ Accent = Color3.fromHex("30D158") }, true, true)
 
 -- Back to the stock theme
-window:SetTheme(nil)
+Window:SetTheme(nil)
 
 -- Single token
-ctx:SetToken("LabelPrimary", Color3.fromHex("FFFFFF"), true)
+Window.Context:SetToken("LabelPrimary", Color3.fromHex("FFFFFF"), true)
+```
+
+If you want a context you own, build it yourself and pass it in:
+
+```lua
+local ctx = Aurora.newContext("Dark", nil, {
+    GlassWindow = Color3.fromHex("10131C"),
+    Accent = Color3.fromHex("FF7AB6"),
+})
+
+local Window = Aurora:CreateWindow({ Title = "My script", Context = ctx })
 ```
 
 Common token names (see `AuroraUI/Theme.lua` for the full list):
@@ -342,15 +521,13 @@ reads as tinted glass rather than a raw photo. Setting an image disables the
 frost layer; clearing it brings the frost back.
 
 ```lua
-local window = Aurora.createWindow({
-    Parent = gui,
-    Context = ctx,
-    Tabs = tabs,
+local Window = Aurora:CreateWindow({
+    Title = "My script",
     BackgroundImage = "rbxassetid://YOUR_IMAGE_ID",
 })
 
-window:SetBackgroundImage("rbxassetid://ANOTHER_ID")
-window:SetBackgroundImage("") -- remove, restore frost
+Window:SetBackgroundImage("rbxassetid://ANOTHER_ID")
+Window:SetBackgroundImage("") -- remove, restore frost
 ```
 
 ---
@@ -408,10 +585,8 @@ print(table.concat(Config.list(), ", "))
 Automatic window autosave:
 
 ```lua
-local window = Aurora.createWindow({
-    Parent = gui,
-    Context = ctx,
-    Tabs = tabs,
+local Window = Aurora:CreateWindow({
+    Title = "My script",
     Config = "my_window", -- or Config = true for "window"
 })
 ```
@@ -421,10 +596,10 @@ background image, window position, and every registered toggle. It saves two
 seconds after a change, and immediately on `Close()`.
 
 ```lua
-window.ConfigHandle:Save()
-window.ConfigHandle:Load()
-window.ConfigHandle:Delete()
-window.ConfigHandle:Destroy()
+Window.ConfigHandle:Save()
+Window.ConfigHandle:Load()
+Window.ConfigHandle:Delete()
+Window.ConfigHandle:Destroy()
 ```
 
 `Config.encode` / `Config.decode` support strings, numbers, booleans, arrays,
@@ -512,6 +687,7 @@ AuroraUI/
   Util.lua            -- signals, tweens, drag, colour helpers
   Theme.lua           -- tokens, accents, modes, overrides
   Config.lua          -- executor JSON persistence
+  Tab.lua             -- simple API: scrolling cards + Add* controls
   Window.lua          -- chrome, shadow, tabs, banner, pill, toggles
   Components/
     init.lua          -- registry + convenience constructors
@@ -521,6 +697,7 @@ AuroraUI/
     Banner.lua, Tooltip.lua, Progress.lua, Input.lua, Dropdown.lua
 AuroraDemo.client.lua -- Figma replica (Overview / Controls / Appearance)
 AuroraKit.client.lua  -- component gallery (Buttons / Fields / Color / Media)
+example.lua           -- executor example: every control on one window
 executor.lua          -- one-line GitHub loader for executors
 assets/               -- Figma reference + generated frost source
 public/               -- images that back the uploaded asset IDs

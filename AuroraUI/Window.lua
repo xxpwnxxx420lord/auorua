@@ -16,6 +16,7 @@ local Components = require(script.Parent.Components)
 local Theme = require(script.Parent.Theme)
 local Util = require(script.Parent.Util)
 local Config = require(script.Parent.Config)
+local Tab = require(script.Parent.Tab)
 
 -- Neutral frosted-glass noise. The glass must never show a landscape, so this
 -- is a colourless frost layer (uploaded from the generated 640x430 texture)
@@ -34,12 +35,36 @@ local CONTENT_HEIGHT = 386
 local ITEM_HEIGHT = 36
 local ITEM_STEP = 40
 
+-- Sidebar tiles default to the three Figma gradients + glyphs when a tab does
+-- not specify its own Badge/Glyph (the normal case for the simple API).
+local DEFAULT_BADGES = {
+	{ Color3.fromHex("5AC8FA"), Color3.fromHex("0A84FF") },
+	{ Color3.fromHex("FFB340"), Color3.fromHex("FF7A00") },
+	{ Color3.fromHex("D47BFF"), Color3.fromHex("6E5CE6") },
+}
+local DEFAULT_GLYPHS = { "grid", "sliders", "paint" }
+
 local function viewport(): Vector2
 	local camera = workspace.CurrentCamera
 	if camera then
 		return camera.ViewportSize
 	end
 	return Vector2.new(1280, 800)
+end
+
+-- Tabs can be a plain string, or a table using either the short API names
+-- (Title/Icon) or the original ones (Name/Glyph).
+local function normalizeTab(spec: any): { [string]: any }
+	if type(spec) == "string" then
+		return { Name = spec }
+	end
+	if type(spec) ~= "table" then
+		return {}
+	end
+	local tab: any = spec
+	tab.Name = tab.Name or tab.Title
+	tab.Glyph = tab.Glyph or tab.Icon
+	return tab
 end
 
 function Window.new(props: { [string]: any }?)
@@ -53,14 +78,19 @@ function Window.new(props: { [string]: any }?)
 		self.Context:SetTheme(options.Theme, false)
 	end
 	self.Player = options.Player or Players.LocalPlayer
-	self.Tabs = options.Tabs or {}
+	self.Tabs = {}
+	for index, spec in ipairs(options.Tabs or {}) do
+		self.Tabs[index] = normalizeTab(spec)
+	end
 	self.Title = options.Title or "Aurora"
+	self.SubTitle = options.SubTitle or options.Subtitle
 	self.BlurredImage = options.BlurredImage or DEFAULT_BLUR
 	-- Custom option: background_image: image id
 	self.BackgroundImage = options.BackgroundImage or options.background_image or ""
 	-- Custom option: starting_tab: int (1-based)
 	self.StartingTab = math.max(1, math.floor(tonumber(options.StartingTab or options.starting_tab) or 1))
 	self.Pages = {}
+	self.TabObjects = {}
 	self.ItemLabels = {}
 	self.ItemHovers = {}
 	self.ActiveIndex = 0
@@ -96,7 +126,9 @@ function Window.new(props: { [string]: any }?)
 	self:_build()
 	self:_startStats()
 	self:_watchViewport()
-	self:SelectTab(self.StartingTab, false)
+	if #self.Tabs > 0 then
+		self:SelectTab(self.StartingTab, false)
+	end
 	self:_openAnimation()
 
 	-- Register value-only toggles passed as `Toggles = { Name = boolean }`.
@@ -323,7 +355,7 @@ function Window:_build()
 	local title = Util.text({
 		Name = "Title",
 		Size = UDim2.fromOffset(WIDTH, TITLEBAR),
-		Text = self.Title,
+		Text = self.SubTitle and (self.Title .. "  ·  " .. self.SubTitle) or self.Title,
 		TextSize = 13,
 		Font = Theme.Font.Semibold,
 		TextXAlignment = Enum.TextXAlignment.Center,
@@ -454,62 +486,7 @@ function Window:_build()
 	self.Selection = selection
 
 	for index, tab in ipairs(self.Tabs) do
-		local item = Util.button({
-			Name = "Item" .. (tab.Name or index),
-			Position = UDim2.fromOffset(12, 12 + (index - 1) * ITEM_STEP),
-			Size = UDim2.fromOffset(148, ITEM_HEIGHT),
-			BackgroundTransparency = 1,
-			ZIndex = 3,
-			Parent = sidebar,
-		})
-		Util.corner(item, Theme.Radius.Item)
-
-		local hover = Util.frame({
-			Name = "Hover",
-			Size = UDim2.fromScale(1, 1),
-			BackgroundColor3 = ctx.Theme.GlassControlHover,
-			BackgroundTransparency = 1,
-			ZIndex = 1,
-			Parent = item,
-		})
-		Util.corner(hover, Theme.Radius.Item)
-		table.insert(self.ItemHovers, hover)
-
-		local colors = tab.Badge or { Color3.fromHex("5AC8FA"), Color3.fromHex("0A84FF") }
-		local badge = Components.Badge.new({
-			Parent = item,
-			Colors = colors,
-			Glyph = tab.Glyph,
-			Size = 20,
-			Radius = 6,
-		})
-		badge.Root.Position = UDim2.fromOffset(12, 8)
-		badge.Root.ZIndex = 3
-
-		local label = Util.text({
-			Name = "Label",
-			Position = UDim2.fromOffset(42, 0),
-			Size = UDim2.new(1, -50, 1, 0),
-			Text = tab.Name or ("Tab " .. index),
-			TextSize = 13,
-			Font = Theme.Font.Medium,
-			TextColor3 = ctx.Theme.LabelSecondary,
-			TextTransparency = ctx.Theme.LabelSecondaryTransparency,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			ZIndex = 3,
-			Parent = item,
-		})
-		table.insert(self.ItemLabels, label)
-
-		item.MouseEnter:Connect(function()
-			Util.tween(hover, { BackgroundTransparency = 0.94 }, Theme.Motion.Hover, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-		end)
-		item.MouseLeave:Connect(function()
-			Util.tween(hover, { BackgroundTransparency = 1 }, Theme.Motion.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-		end)
-		item.Activated:Connect(function()
-			self:SelectTab(index, true)
-		end)
+		self:_createSidebarItem(tab, index)
 	end
 
 	local footer = Util.frame({
@@ -601,23 +578,7 @@ function Window:_build()
 	-- Pages
 	------------------------------------------------------------
 	for index, tab in ipairs(self.Tabs) do
-		local page = Instance.new("CanvasGroup")
-		page.Name = tab.Name or ("Page" .. index)
-		page.Position = UDim2.fromOffset(0, 0)
-		page.Size = UDim2.fromOffset(CONTENT_WIDTH, CONTENT_HEIGHT)
-		page.BackgroundTransparency = 1
-		page.GroupTransparency = 1
-		page.Visible = false
-		page.ZIndex = 3
-		page.Parent = content
-		self.Pages[index] = page
-
-		if tab.Build then
-			local ok, err = pcall(tab.Build, page, ctx, self)
-			if not ok then
-				warn("[Aurora] Page '" .. tostring(tab.Name) .. "' failed: " .. tostring(err))
-			end
-		end
+		self:_createPage(tab, index)
 	end
 
 	------------------------------------------------------------
@@ -685,6 +646,103 @@ function Window:_build()
 	ctx:Bind(function(t: any, duration: number)
 		self:_applyChrome(t, duration)
 	end)
+end
+
+function Window:_createSidebarItem(tab: any, index: number)
+	local ctx = self.Context
+	local item = Util.button({
+		Name = "Item" .. (tab.Name or index),
+		Position = UDim2.fromOffset(12, 12 + (index - 1) * ITEM_STEP),
+		Size = UDim2.fromOffset(148, ITEM_HEIGHT),
+		BackgroundTransparency = 1,
+		ZIndex = 3,
+		Parent = self.Sidebar,
+	})
+	Util.corner(item, Theme.Radius.Item)
+
+	local hover = Util.frame({
+		Name = "Hover",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = ctx.Theme.GlassControlHover,
+		BackgroundTransparency = 1,
+		ZIndex = 1,
+		Parent = item,
+	})
+	Util.corner(hover, Theme.Radius.Item)
+	table.insert(self.ItemHovers, hover)
+
+	local colors = tab.Badge or DEFAULT_BADGES[((index - 1) % #DEFAULT_BADGES) + 1]
+	-- Simple tabs usually have no icon; cycle the Figma glyphs so the sidebar
+	-- tiles still read as icons. Pass `Icon = ""` to get a flat tile instead.
+	local glyph = tab.Glyph
+	if glyph == nil and tab.Badge == nil then
+		glyph = DEFAULT_GLYPHS[((index - 1) % #DEFAULT_GLYPHS) + 1]
+	end
+	local badge = Components.Badge.new({
+		Parent = item,
+		Colors = colors,
+		Glyph = glyph,
+		Size = 20,
+		Radius = 6,
+	})
+	badge.Root.Position = UDim2.fromOffset(12, 8)
+	badge.Root.ZIndex = 3
+
+	local label = Util.text({
+		Name = "Label",
+		Position = UDim2.fromOffset(42, 0),
+		Size = UDim2.new(1, -50, 1, 0),
+		Text = tab.Name or ("Tab " .. index),
+		TextSize = 13,
+		Font = Theme.Font.Medium,
+		TextColor3 = ctx.Theme.LabelSecondary,
+		TextTransparency = ctx.Theme.LabelSecondaryTransparency,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 3,
+		Parent = item,
+	})
+	table.insert(self.ItemLabels, label)
+
+	item.MouseEnter:Connect(function()
+		Util.tween(hover, { BackgroundTransparency = 0.94 }, Theme.Motion.Hover, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	end)
+	item.MouseLeave:Connect(function()
+		Util.tween(hover, { BackgroundTransparency = 1 }, Theme.Motion.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	end)
+	item.Activated:Connect(function()
+		self:SelectTab(index, true)
+	end)
+end
+
+function Window:_createPage(tab: any, index: number): any
+	local page = Instance.new("CanvasGroup")
+	page.Name = tab.Name or ("Page" .. index)
+	page.Position = UDim2.fromOffset(0, 0)
+	page.Size = UDim2.fromOffset(CONTENT_WIDTH, CONTENT_HEIGHT)
+	page.BackgroundTransparency = 1
+	page.GroupTransparency = 1
+	page.Visible = false
+	page.ZIndex = 3
+	page.Parent = self.Content
+	self.Pages[index] = page
+
+	if tab.Build then
+		local ok, err = pcall(tab.Build, page, self.Context, self)
+		if not ok then
+			warn("[Aurora] Page '" .. tostring(tab.Name) .. "' failed: " .. tostring(err))
+		end
+		return page
+	end
+
+	local tabObject = Tab.new({
+		Window = self,
+		Context = self.Context,
+		Page = page,
+		Index = index,
+		Title = tab.Name,
+	})
+	self.TabObjects[index] = tabObject
+	return tabObject
 end
 
 --------------------------------------------------------------------------------
@@ -1009,18 +1067,68 @@ function Window:ShowBanner(options: { [string]: any }?)
 	self.Banner:Show()
 	self._bannerToken += 1
 	local token = self._bannerToken
-	task.delay(opts.Duration or 3.6, function()
-		if token == self._bannerToken then
-			self.Banner:Hide()
-		end
-	end)
+	local duration = opts.Duration
+	if duration == nil then
+		duration = 3.6
+	end
+	-- Duration = false keeps the banner up until the next notification.
+	if duration ~= false then
+		task.delay(duration, function()
+			if token == self._bannerToken then
+				self.Banner:Hide()
+			end
+		end)
+	end
+end
+
+-- Simple API alias. Accepts a string title or the same table as ShowBanner.
+-- Duration = false keeps the banner on screen.
+function Window:Notify(options: any)
+	local opts = type(options) == "string" and { Title = options } or (options or {})
+	local duration = opts.Duration
+	if duration == nil then
+		duration = opts.duration
+	end
+	self:ShowBanner({
+		Title = opts.Title or opts.title or "Aurora",
+		Body = opts.Content or opts.Body or opts.content or opts.body or "",
+		Time = opts.Time or opts.time or "now",
+		Duration = duration,
+	})
 end
 
 --------------------------------------------------------------------------------
 -- Tabs
 --------------------------------------------------------------------------------
 
+function Window:AddTab(spec: any): any
+	local tab = normalizeTab(spec)
+	table.insert(self.Tabs, tab)
+	local index = #self.Tabs
+	self:_createSidebarItem(tab, index)
+	local result = self:_createPage(tab, index)
+	if self.ActiveIndex == 0 then
+		self:SelectTab(index, false)
+	end
+	return result
+end
+
+function Window:GetTab(key: number | string): any
+	if type(key) == "string" then
+		for index, tab in ipairs(self.Tabs) do
+			if tab.Name == key then
+				return self.TabObjects[index] or self.Pages[index]
+			end
+		end
+		return nil
+	end
+	return self.TabObjects[key] or self.Pages[key]
+end
+
 function Window:SelectTab(index: number, animate: boolean?)
+	if #self.Tabs == 0 then
+		return
+	end
 	local target = math.clamp(math.floor(index), 1, #self.Tabs)
 	if target == self.ActiveIndex then
 		return
@@ -1796,6 +1904,9 @@ function Window:Destroy()
 	end
 	if self.Overlay then
 		self.Overlay:Destroy()
+	end
+	if self.OwnsGui and self.ScreenGui then
+		self.ScreenGui:Destroy()
 	end
 end
 

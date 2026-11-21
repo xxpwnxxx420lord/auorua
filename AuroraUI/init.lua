@@ -17,13 +17,14 @@ local Players = game:GetService("Players")
 
 local Aurora = {}
 
-Aurora.Version = "1.1.0"
+Aurora.Version = "1.2.0"
 Aurora.Name = "Aurora"
 
 Aurora.Util = require(script.Util)
 Aurora.Theme = require(script.Theme)
 Aurora.Config = require(script.Config)
 Aurora.Components = require(script.Components)
+Aurora.Tab = require(script.Tab)
 Aurora.Window = require(script.Window)
 
 -- Asset IDs used by the library. The matching source images live in
@@ -198,6 +199,56 @@ function Aurora.createWindow(props: { [string]: any }?)
 		options.Context = Aurora.newContext(options.Mode, options.Accent, options.Theme)
 	end
 	return Aurora.Window.new(options)
+end
+
+-- The short API:
+--
+--   local Window = Aurora:CreateWindow({ Title = "My script" })
+--   local Main = Window:AddTab("Main")
+--   Main:AddToggle("Auto apply", true)
+--
+-- It creates the ScreenGui, context and window for you. `Theme` may be a mode
+-- string ("Dark"/"Light") or the usual token override table.
+local function createSimpleWindow(options: { [string]: any }?)
+	local opts = options or {}
+	local parent = opts.Parent
+	local ownsGui = false
+	if not parent then
+		parent = Aurora.newScreenGui({
+			Name = opts.Name or opts.Title or "Aurora",
+			DisplayOrder = opts.DisplayOrder,
+		})
+		ownsGui = true
+	end
+
+	local mode = opts.Mode
+	if not mode and type(opts.Theme) == "string" then
+		mode = opts.Theme
+	end
+	local overrides = type(opts.Theme) == "table" and opts.Theme or opts.ThemeOverrides
+	local ctx = opts.Context or Aurora.newContext(mode, opts.Accent, overrides)
+
+	local window = Aurora.Window.new({
+		Parent = parent,
+		Context = ctx,
+		Player = opts.Player,
+		Title = opts.Title,
+		SubTitle = opts.SubTitle or opts.Subtitle,
+		Tabs = opts.Tabs,
+		StartingTab = opts.StartingTab or opts.starting_tab,
+		BackgroundImage = opts.BackgroundImage or opts.background_image,
+		Config = opts.Config,
+		BlurredImage = opts.BlurredImage,
+	})
+	window.ScreenGui = parent
+	window.OwnsGui = ownsGui
+	return window
+end
+
+-- Accepts Aurora:CreateWindow({...}) and Aurora.CreateWindow({...}).
+function Aurora.CreateWindow(first: any, second: any)
+	local options = first == Aurora and second or first
+	return createSimpleWindow(options)
 end
 
 return Aurora

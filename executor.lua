@@ -38,6 +38,7 @@ local TREE = {
 	{ Path = "AuroraUI/Util.lua", Key = "AuroraUI.Util", Name = "Util", Parent = "AuroraUI" },
 	{ Path = "AuroraUI/Theme.lua", Key = "AuroraUI.Theme", Name = "Theme", Parent = "AuroraUI" },
 	{ Path = "AuroraUI/Config.lua", Key = "AuroraUI.Config", Name = "Config", Parent = "AuroraUI" },
+	{ Path = "AuroraUI/Tab.lua", Key = "AuroraUI.Tab", Name = "Tab", Parent = "AuroraUI" },
 	{ Path = "AuroraUI/Window.lua", Key = "AuroraUI.Window", Name = "Window", Parent = "AuroraUI" },
 	{ Path = "AuroraUI/Components/init.lua", Key = "AuroraUI.Components", Name = "Components", Parent = "AuroraUI" },
 	{ Path = "AuroraUI/Components/Common.lua", Key = "AuroraUI.Components.Common", Name = "Common", Parent = "AuroraUI.Components" },
