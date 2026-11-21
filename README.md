@@ -17,10 +17,11 @@ for the pieces most UI libraries hide.
   spring-driven sliders, hover growth, drag lift + velocity tilt, minimize to a
   pill, notification banner, and a restore animation that fades the shadow back
   in.
-- **Executor friendly.** `Aurora.newScreenGui()` parents to `gethui()` when the
-  executor provides it, then `CoreGui`, then `PlayerGui`. Optional configs use
-  `writefile` / `readfile` / `makefolder` / `listfiles` / `delfile`, and fall
-  back to an in-memory store in Studio.
+- **Executor friendly.** `executor.lua` installs the whole module tree with one
+  `loadstring` line — no Studio, no Rojo. `Aurora.newScreenGui()` parents to
+  `gethui()` when the executor provides it, then `CoreGui`, then `PlayerGui`.
+  Optional configs use `writefile` / `readfile` / `makefolder` / `listfiles` /
+  `delfile`, and fall back to an in-memory store in Studio.
 - **Custom options:** `StartingTab`, `Close()` / `Open()`, `ChangeToggle`,
   a `Theme` override table, and `BackgroundImage`.
 
@@ -39,7 +40,7 @@ rojo serve
 This maps `AuroraUI/` to `ReplicatedStorage.AuroraUI` and the two demo scripts
 to `StarterPlayerScripts`.
 
-### Manual / executor
+### Manual (Studio)
 
 1. Create a **ModuleScript** named `AuroraUI` in `ReplicatedStorage`.
 2. Copy `AuroraUI/init.lua` into it.
@@ -55,6 +56,85 @@ local Aurora = require(game:GetService("ReplicatedStorage").AuroraUI)
 
 > The demo and gallery scripts are optional. They only need `AuroraDemo` and
 > `AuroraKit` LocalScripts in `StarterPlayerScripts`.
+
+### Executor (no Studio)
+
+Aurora is a module tree, not one pasted script, so the repository ships
+[`executor.lua`](executor.lua). It downloads every module from GitHub, builds
+them as ModuleScripts inside the executor's hidden UI, requires the library,
+and returns it:
+
+```lua
+local Aurora = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/xxpwnxxx420lord/auorua/main/executor.lua"
+))()
+```
+
+That is the entire installation. Use it exactly like the Studio examples:
+
+```lua
+local gui = Aurora.newScreenGui({ Name = "Aurora" })
+local ctx = Aurora.newContext("Dark")
+local window = Aurora.createWindow({
+    Parent = gui,
+    Context = ctx,
+    Tabs = tabs,
+})
+```
+
+**Requirements**
+
+- `game:HttpGet` with outbound access to `raw.githubusercontent.com`
+- `loadstring` (or paste `executor.lua` into your executor's script runner)
+- That's it — no Rojo, no Studio, no manual ModuleScripts
+
+The loader parents the module tree to `gethui()` when the executor exposes it,
+then `CoreGui`, then `PlayerGui` as a last resort. It prints one line when the
+download starts and one when it finishes.
+
+**Caching and updates**
+
+The built tree and the returned `Aurora` table are cached in `getgenv()` (or
+`_G` when the executor has no `getgenv`), so running the one-liner again in the
+same session is instant. To pick up a newer commit, force a fresh download:
+
+```lua
+local Aurora = loadstring(game:HttpGet(URL))({ Refresh = true })
+```
+
+Other options:
+
+```lua
+local Aurora = loadstring(game:HttpGet(URL))({
+    Refresh = true,   -- ignore the session cache
+    Silent = true,    -- no loader prints
+    BaseUrl = "https://raw.githubusercontent.com/xxpwnxxx420lord/auorua/COMMIT_HASH/",
+})
+```
+
+`BaseUrl` is how you pin a version: replace `main` with a commit SHA or use your
+own fork. The default URL always tracks `main`.
+
+The loader is inspectable after it runs:
+
+```lua
+print(Aurora.Loader.Parent)  -- "gethui", "CoreGui", "PlayerGui" or "ReplicatedStorage"
+print(Aurora.Loader.Folder)  -- the AuroraUILoader folder
+print(Aurora.Loader.BaseUrl)
+```
+
+**Configs on an executor**
+
+Everything in [Configs](#configs-executor-persistence) works in an executor.
+`writefile` is optional: when the executor provides `writefile` / `readfile`,
+profiles persist to `AuroraUI/<name>.json`; without them, configs live in
+memory for the session. Window autosave (`Config = "my_window"`) is the easiest
+way to keep tabs, toggles, accent and position between launches.
+
+> Some executors block `require()` on instances created at runtime. If the
+> loader errors at the `require` step, use an executor that supports it (most
+> mainstream ones do), or install the files manually with the Studio steps
+> above and require the resulting ModuleScript.
 
 ---
 
@@ -277,6 +357,7 @@ window:SetBackgroundImage("") -- remove, restore frost
 
 ## Executor / CoreGui
 
+Install with the [one-line executor loader](#executor-no-studio), then
 `Aurora.newScreenGui()` handles the parent chain for you:
 
 1. `gethui()` from the executor, if present
@@ -440,6 +521,7 @@ AuroraUI/
     Banner.lua, Tooltip.lua, Progress.lua, Input.lua, Dropdown.lua
 AuroraDemo.client.lua -- Figma replica (Overview / Controls / Appearance)
 AuroraKit.client.lua  -- component gallery (Buttons / Fields / Color / Media)
+executor.lua          -- one-line GitHub loader for executors
 assets/               -- Figma reference + generated frost source
 public/               -- images that back the uploaded asset IDs
 default.project.json  -- Rojo mapping
