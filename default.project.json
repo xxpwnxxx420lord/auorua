@@ -1,0 +1,24 @@
+{
+  "name": "AuroraUI",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "AuroraUI": {
+        "$path": "AuroraUI"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "AuroraDemo": {
+          "$path": "AuroraDemo.client.lua"
+        },
+        "AuroraKit": {
+          "$path": "AuroraKit.client.lua"
+        }
+      }
+    }
+  }
+}
